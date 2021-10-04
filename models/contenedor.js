@@ -1,8 +1,12 @@
 const fs = require('fs')
+const moment = require('moment')
 
 class Contenedor {
     constructor(filename) {
         this.filename = filename
+        if (! fs.existsSync(this.filename)) {
+            fs.writeFileSync(this.filename, JSON.stringify([]))
+        }
     }
 
     async create(product) {
@@ -10,27 +14,30 @@ class Contenedor {
 
         if (contenido.length == 0) {
             product.id = 1
-            contenido.push(product)
         } else {
             product.id = contenido[contenido.length - 1].id + 1
-            contenido.push(product)
         }
+
+        product.timestamp = moment().unix()
+        contenido.push(product)
 
         await fs.promises.writeFile(this.filename, JSON.stringify(contenido))
 
-        return product.id
+        return product
     }
 
-    async update(id, product) {
+    async update(id, newObject) {
         const contenido = await this.getAll()
 
-        const index = contenido.findIndex(p => p.id === id)
+        const index = contenido.findIndex(p => p.id == id)
+
         if (index !== -1) {
-            contenido[index].title = product.title
-            contenido[index].price = product.price
-            contenido[index].thumbnail = product.thumbnail
+            let keys = Object.keys(newObject)
+            keys.map(x=>{
+                contenido[index][x] = newObject[x]
+            })
         } else {
-            throw Error('producto no encontrado')
+            throw Error('-1')
         }
 
         await fs.promises.writeFile(this.filename, JSON.stringify(contenido))
@@ -39,12 +46,12 @@ class Contenedor {
     async getById(id) {
         const contenido = await this.getAll()
 
-        const filteredProduct = contenido.filter(producto => producto['id'] == id)
+        const filteredProduct = contenido.filter(producto => producto.id == id)
 
         if (filteredProduct.length !== 0) {
             return filteredProduct[0]
         } else {
-            throw Error('producto no encontrado')
+            throw Error('-1')
         }
     }
 
@@ -64,12 +71,42 @@ class Contenedor {
         if (filteredProduct.length !== 0) {
             await fs.promises.writeFile(this.filename, JSON.stringify(contenido.filter(element => element.id != id)))
         } else {
-            throw Error('producto no encontrado')
+            throw Error('-1')
         }
     }
 
     async deleteAll() {
         await fs.promises.writeFile(this.filename, JSON.stringify([])) //borro todos los elementos
+    }
+
+    async addCartProduct(cartId, productData){
+        const contenido = await this.getAll()
+        const filteredCarts = contenido.filter(cart => cart['id'] == cartId)
+        
+        if (filteredCarts.length !== 0) {
+            filteredCarts[0].products.push(productData)
+            
+            await fs.promises.writeFile(this.filename, JSON.stringify(contenido))
+        } else {
+            throw Error('-1')
+        } 
+    }
+
+    async deleteCartProductById(cartId, pid){
+        const carritos = await this.getAll()
+        const filteredCart = carritos.filter(cart => cart['id'] == cartId)
+        
+        if (filteredCart.length !== 0) {
+            filteredCart[0].products.forEach((element, index, object) => {
+                if(element.id == pid) {
+                    object.splice(index,1)
+                }
+            })
+            await fs.promises.writeFile(this.filename, JSON.stringify(carritos))
+            return carritos
+        } else {
+            throw Error('-1')
+        } 
     }
 }
 
